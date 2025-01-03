@@ -17,9 +17,10 @@ def make_data():
     eqs = torch.tensor(eqs, dtype=torch.int64)
     return eqs
 
-
+#增加参数num_operands，即问题中的K
 def make_data_k(num_operands=2):
     op_add, op_eq = MODULUS, MODULUS + 1
+    #重复num_operands次
     tuples = itertools.product(NUMS, repeat=num_operands)
     eqs = []
     for ops in tuples:
@@ -51,6 +52,7 @@ def prepare_loader(training_frac = 0.5, batch_size = 512):
 
 #加入参数num_operands(k)和modulus(p)
 def prepare_loader_k(training_frac=0.5, batch_size=512, num_operands=2, modulus=97):
+    
     # 动态生成数据
     global MODULUS, NUMS
     MODULUS = modulus

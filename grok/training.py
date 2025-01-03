@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from data import prepare_loader
 from data import prepare_loader_k
-
+import os
 from argparse import ArgumentParser
 from model import Transformer, MLP, LSTMModel
 
@@ -100,16 +100,9 @@ def train_k(model_type, device, training_fraction, batch_size, max_steps, dropou
     train_losses, train_accuracies = [], []
     val_losses, val_accuracies = [], []
     steps = []
+    #补充对weight_norms的记录
+    weight_norms=[]
 
-    print("p=",modulus)
-    print("k=",num_operands)
-    print("training_fraction",training_fraction)
-    print("max_steps=",max_steps)
-    print("batch_size=",batch_size)
-    print("weight_decay",weight_decay)
-    print("dropout",dropout)
-    print("len(train_loader)=",len(train_loader))
-    print("n_epochs=",n_epochs)
 
     for epoch in tqdm(range(n_epochs)):
         model.train()
@@ -126,6 +119,14 @@ def train_k(model_type, device, training_fraction, batch_size, max_steps, dropou
 
             epoch_train_loss += loss.item()
             epoch_train_accuracy += accuracy
+        
+        # 计算 weight norm
+        with torch.no_grad():
+            total_weight_norm = 0
+            for name, param in model.named_parameters():
+                if 'weight' in name: 
+                    total_weight_norm += torch.norm(param).item()
+            weight_norms.append(total_weight_norm)
 
         train_losses.append(epoch_train_loss / len(train_loader))
         train_accuracies.append(epoch_train_accuracy / len(train_loader))
@@ -149,7 +150,9 @@ def train_k(model_type, device, training_fraction, batch_size, max_steps, dropou
         print(f"Epoch {epoch}, train loss {train_losses[-1]}, train accuracy {train_accuracies[-1]}")
         print(f"Epoch {epoch}, val loss {val_losses[-1]}, val accuracy {val_accuracies[-1]}")
 
-    return train_losses, train_accuracies, val_losses, val_accuracies, steps
+    #增加了对weight_norms的输出
+    return train_losses, train_accuracies, val_losses, val_accuracies, steps, weight_norms
+
 
 def main():
     # parse arguments
@@ -170,19 +173,18 @@ def main():
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #train_loss, train_acc, val_loss, val_acc, steps = train(args.model, device, args.training_fraction, args.batch_size, args.max_steps, args.dropout, args.weight_decay, args.start_lr, args.optimizer_type)
-    train_loss, train_acc, val_loss, val_acc, steps = train_k(args.model, device, args.training_fraction, args.batch_size, args.max_steps, args.dropout, args.weight_decay, args.start_lr, args.optimizer_type, args.num_operands, args.modulus)
 
+    #使用train_k
+    train_loss, train_acc, val_loss, val_acc, steps ,weight_norms= train_k(args.model, device, args.training_fraction, args.batch_size, args.max_steps, args.dropout, args.weight_decay, args.start_lr, args.optimizer_type, args.num_operands, args.modulus)
 
-    # Plot accuracy curves
     plt.plot(steps, train_acc, label='Training Accuracy')
     plt.plot(steps, val_acc, label='Validation Accuracy')
     plt.xlabel('Steps')
     plt.ylabel('Accuracy')
     plt.xscale('log')
     plt.legend()
-    plt.title('Training and Validation Accuracy_p=23_k=3_wd=0.1_frac=0.2_dropout=0_bs=1024')
+    plt.title('Training and Validation Accuracy')
     plt.show()
-    plt.savefig('p=23_k=3_wd=0.1_frac=0.2_dropout=0_bs=1024.png')
+
 if __name__ == "__main__":
     main()
